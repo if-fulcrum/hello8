@@ -37,8 +37,8 @@ class EditorImageDialogTest extends EntityKernelTestBase {
     parent::setUp();
     $this->installEntitySchema('file');
     $this->installSchema('system', ['key_value_expire']);
-    $this->installSchema('node', array('node_access'));
-    $this->installSchema('file', array('file_usage'));
+    $this->installSchema('node', ['node_access']);
+    $this->installSchema('file', ['file_usage']);
     $this->installConfig(['node']);
 
     // Add text formats.
@@ -108,7 +108,7 @@ class EditorImageDialogTest extends EntityKernelTestBase {
       ->addBuildInfo('args', [$this->editor]);
 
     $form_builder = $this->container->get('form_builder');
-    $form_object = new EditorImageDialog(\Drupal::entityManager()->getStorage('file'));
+    $form_object = new EditorImageDialog(\Drupal::entityTypeManager()->getStorage('file'));
     $form_id = $form_builder->getFormId($form_object, $form_state);
     $form = $form_builder->retrieveForm($form_id, $form_state);
     $form_builder->prepareForm($form_id, $form, $form_state);

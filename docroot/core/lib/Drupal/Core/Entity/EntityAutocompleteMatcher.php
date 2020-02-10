@@ -50,19 +50,19 @@ class EntityAutocompleteMatcher {
    * @see \Drupal\system\Controller\EntityAutocompleteController
    */
   public function getMatches($target_type, $selection_handler, $selection_settings, $string = '') {
-    $matches = array();
+    $matches = [];
 
-    $options = array(
+    $options = $selection_settings + [
       'target_type' => $target_type,
       'handler' => $selection_handler,
-      'handler_settings' => $selection_settings,
-    );
+    ];
     $handler = $this->selectionManager->getInstance($options);
 
     if (isset($string)) {
       // Get an array of matching entities.
       $match_operator = !empty($selection_settings['match_operator']) ? $selection_settings['match_operator'] : 'CONTAINS';
-      $entity_labels = $handler->getReferenceableEntities($string, $match_operator, 10);
+      $match_limit = isset($selection_settings['match_limit']) ? (int) $selection_settings['match_limit'] : 10;
+      $entity_labels = $handler->getReferenceableEntities($string, $match_operator, $match_limit);
 
       // Loop through the entities and convert them into autocomplete output.
       foreach ($entity_labels as $values) {
@@ -73,7 +73,7 @@ class EntityAutocompleteMatcher {
           $key = preg_replace('/\s\s+/', ' ', str_replace("\n", '', trim(Html::decodeEntities(strip_tags($key)))));
           // Names containing commas or quotes must be wrapped in quotes.
           $key = Tags::encode($key);
-          $matches[] = array('value' => $key, 'label' => $label);
+          $matches[] = ['value' => $key, 'label' => $label];
         }
       }
     }

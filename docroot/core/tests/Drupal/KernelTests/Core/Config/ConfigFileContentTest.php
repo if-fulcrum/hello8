@@ -3,6 +3,7 @@
 namespace Drupal\KernelTests\Core\Config;
 
 use Drupal\Core\Config\FileStorage;
+use Drupal\Core\Site\Settings;
 use Drupal\KernelTests\KernelTestBase;
 
 /**
@@ -15,7 +16,7 @@ class ConfigFileContentTest extends KernelTestBase {
   /**
    * Exempt from strict schema checking.
    *
-   * @see \Drupal\Core\Config\Testing\ConfigSchemaChecker
+   * @see \Drupal\Core\Config\Development\ConfigSchemaChecker
    *
    * @var bool
    */
@@ -24,7 +25,7 @@ class ConfigFileContentTest extends KernelTestBase {
   /**
    * Tests setting, writing, and reading of a configuration setting.
    */
-  function testReadWriteConfig() {
+  public function testReadWriteConfig() {
     $storage = $this->container->get('config.storage');
 
     $name = 'foo.bar';
@@ -33,19 +34,19 @@ class ConfigFileContentTest extends KernelTestBase {
     $nested_key = 'biff.bang';
     $nested_value = 'pow';
     $array_key = 'array';
-    $array_value = array(
+    $array_value = [
       'foo' => 'bar',
-      'biff' => array(
+      'biff' => [
         'bang' => 'pow',
-      ),
-    );
+      ],
+    ];
     $casting_array_key = 'casting_array';
     $casting_array_false_value_key = 'casting_array.cast.false';
-    $casting_array_value = array(
-      'cast' => array(
+    $casting_array_value = [
+      'cast' => [
         'false' => FALSE,
-      ),
-    );
+      ],
+    ];
     $nested_array_key = 'nested.array';
     $true_key = 'true';
     $false_key = 'false';
@@ -55,10 +56,10 @@ class ConfigFileContentTest extends KernelTestBase {
 
     // Verify a configuration object is returned.
     $this->assertEqual($config->getName(), $name);
-    $this->assertTrue($config, 'Config object created.');
+    $this->assertNotEmpty($config, 'Config object created.');
 
     // Verify the configuration object is empty.
-    $this->assertEqual($config->get(), array(), 'New config object is empty.');
+    $this->assertEqual($config->get(), [], 'New config object is empty.');
 
     // Verify nothing was saved.
     $data = $storage->read($name);
@@ -92,12 +93,12 @@ class ConfigFileContentTest extends KernelTestBase {
 
     // Verify the database entry exists.
     $data = $storage->read($name);
-    $this->assertTrue($data);
+    $this->assertNotEmpty($data);
 
     // Read top level value.
     $config = $this->config($name);
     $this->assertEqual($config->getName(), $name);
-    $this->assertTrue($config, 'Config object created.');
+    $this->assertNotEmpty($config, 'Config object created.');
     $this->assertEqual($config->get($key), 'bar', 'Top level configuration value found.');
 
     // Read nested value.
@@ -125,7 +126,7 @@ class ConfigFileContentTest extends KernelTestBase {
     $this->assertIdentical($config->get('null'), NULL);
 
     // Read false that had been nested in an array value.
-    $this->assertSame($config->get($casting_array_false_value_key), FALSE, "Nested boolean FALSE value returned FALSE.");
+    $this->assertSame(FALSE, $config->get($casting_array_false_value_key), "Nested boolean FALSE value returned FALSE.");
 
     // Unset a top level value.
     $config->clear($key);
@@ -173,7 +174,7 @@ class ConfigFileContentTest extends KernelTestBase {
     // Get file listing for all files starting with 'bar'. Should return
     // an empty array.
     $files = $storage->listAll('bar');
-    $this->assertEqual($files, array(), 'No files listed with the prefix \'bar\'.');
+    $this->assertEqual($files, [], 'No files listed with the prefix \'bar\'.');
 
     // Delete the configuration.
     $config = $this->config($name);
@@ -187,45 +188,45 @@ class ConfigFileContentTest extends KernelTestBase {
   /**
    * Tests serialization of configuration to file.
    */
-  function testSerialization() {
+  public function testSerialization() {
     $name = $this->randomMachineName(10) . '.' . $this->randomMachineName(10);
-    $config_data = array(
+    $config_data = [
       // Indexed arrays; the order of elements is essential.
-      'numeric keys' => array('i', 'n', 'd', 'e', 'x', 'e', 'd'),
+      'numeric keys' => ['i', 'n', 'd', 'e', 'x', 'e', 'd'],
       // Infinitely nested keys using arbitrary element names.
-      'nested keys' => array(
+      'nested keys' => [
         // HTML/XML in values.
         'HTML' => '<strong> <bold> <em> <blockquote>',
         // UTF-8 in values.
         'UTF-8' => 'FrançAIS is ÜBER-åwesome',
         // Unicode in keys and values.
         'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΣὨ' => 'αβγδεζηθικλμνξοσὠ',
-      ),
+      ],
       'invalid xml' => '</title><script type="text/javascript">alert("Title XSS!");</script> & < > " \' ',
-    );
+    ];
 
     // Encode and write, and reload and decode the configuration data.
-    $filestorage = new FileStorage(config_get_config_directory(CONFIG_SYNC_DIRECTORY));
+    $filestorage = new FileStorage(Settings::get('config_sync_directory'));
     $filestorage->write($name, $config_data);
     $config_parsed = $filestorage->read($name);
 
     $key = 'numeric keys';
-    $this->assertIdentical($config_data[$key], $config_parsed[$key]);
+    $this->assertSame($config_data[$key], $config_parsed[$key]);
 
     $key = 'nested keys';
-    $this->assertIdentical($config_data[$key], $config_parsed[$key]);
+    $this->assertSame($config_data[$key], $config_parsed[$key]);
 
     $key = 'HTML';
-    $this->assertIdentical($config_data['nested keys'][$key], $config_parsed['nested keys'][$key]);
+    $this->assertSame($config_data['nested keys'][$key], $config_parsed['nested keys'][$key]);
 
     $key = 'UTF-8';
-    $this->assertIdentical($config_data['nested keys'][$key], $config_parsed['nested keys'][$key]);
+    $this->assertSame($config_data['nested keys'][$key], $config_parsed['nested keys'][$key]);
 
     $key = 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΣὨ';
-    $this->assertIdentical($config_data['nested keys'][$key], $config_parsed['nested keys'][$key]);
+    $this->assertSame($config_data['nested keys'][$key], $config_parsed['nested keys'][$key]);
 
     $key = 'invalid xml';
-    $this->assertIdentical($config_data[$key], $config_parsed[$key]);
+    $this->assertSame($config_data[$key], $config_parsed[$key]);
   }
 
 }

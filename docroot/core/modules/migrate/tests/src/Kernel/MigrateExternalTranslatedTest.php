@@ -18,11 +18,8 @@ class MigrateExternalTranslatedTest extends MigrateTestBase {
 
   /**
    * {@inheritdoc}
-   *
-   * @todo: Remove migrate_drupal when https://www.drupal.org/node/2560795 is
-   * fixed.
    */
-  public static $modules = ['system', 'user', 'language', 'node', 'field', 'migrate_drupal', 'migrate_external_translated_test'];
+  public static $modules = ['system', 'user', 'language', 'node', 'field', 'migrate_external_translated_test'];
 
   /**
    * {@inheritdoc}
@@ -30,7 +27,7 @@ class MigrateExternalTranslatedTest extends MigrateTestBase {
   public function setUp() {
     parent::setUp();
     $this->installSchema('system', ['sequences']);
-    $this->installSchema('node', array('node_access'));
+    $this->installSchema('node', ['node_access']);
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
 
@@ -51,7 +48,7 @@ class MigrateExternalTranslatedTest extends MigrateTestBase {
    */
   public function testMigrations() {
     /** @var \Drupal\Core\Entity\ContentEntityStorageInterface $storage */
-    $storage = $this->container->get('entity.manager')->getStorage('node');
+    $storage = $this->container->get('entity_type.manager')->getStorage('node');
     $this->assertEquals(0, count($storage->loadMultiple()));
 
     // Run the migrations.

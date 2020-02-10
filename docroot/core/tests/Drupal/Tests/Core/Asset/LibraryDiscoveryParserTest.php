@@ -7,7 +7,11 @@
 
 namespace Drupal\Tests\Core\Asset;
 
+use Drupal\Core\Asset\Exception\IncompleteLibraryDefinitionException;
+use Drupal\Core\Asset\Exception\InvalidLibraryFileException;
+use Drupal\Core\Asset\Exception\LibraryDefinitionMissingLicenseException;
 use Drupal\Core\Asset\LibraryDiscoveryParser;
+use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Tests\UnitTestCase;
 
 /**
@@ -26,30 +30,37 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
   /**
    * The mocked cache backend.
    *
-   * @var \Drupal\Core\Cache\CacheBackendInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Cache\CacheBackendInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $cache;
 
   /**
    * The mocked module handler.
    *
-   * @var \Drupal\Core\Extension\ModuleHandlerInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Extension\ModuleHandlerInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $moduleHandler;
 
   /**
    * The mocked theme manager.
    *
-   * @var \Drupal\Core\Theme\ThemeManagerInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Theme\ThemeManagerInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $themeManager;
 
   /**
    * The mocked lock backend.
    *
-   * @var \Drupal\Core\Lock\LockBackendInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\Lock\LockBackendInterface|\PHPUnit\Framework\MockObject\MockObject
    */
   protected $lock;
+
+  /**
+   * The mocked stream wrapper manager.
+   *
+   * @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface||\PHPUnit\Framework\MockObject\MockObject
+   */
+  protected $streamWrapperManager;
 
   /**
    * {@inheritdoc}
@@ -57,8 +68,8 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
   protected function setUp() {
     parent::setUp();
 
-    $this->moduleHandler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
-    $this->themeManager = $this->getMock('Drupal\Core\Theme\ThemeManagerInterface');
+    $this->moduleHandler = $this->createMock('Drupal\Core\Extension\ModuleHandlerInterface');
+    $this->themeManager = $this->createMock('Drupal\Core\Theme\ThemeManagerInterface');
     $mock_active_theme = $this->getMockBuilder('Drupal\Core\Theme\ActiveTheme')
       ->disableOriginalConstructor()
       ->getMock();
@@ -68,7 +79,8 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $this->themeManager->expects($this->any())
       ->method('getActiveTheme')
       ->willReturn($mock_active_theme);
-    $this->libraryDiscoveryParser = new TestLibraryDiscoveryParser($this->root, $this->moduleHandler, $this->themeManager);
+    $this->streamWrapperManager = $this->createMock(StreamWrapperManagerInterface::class);
+    $this->libraryDiscoveryParser = new TestLibraryDiscoveryParser($this->root, $this->moduleHandler, $this->themeManager, $this->streamWrapperManager);
   }
 
   /**
@@ -137,13 +149,11 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $path = substr($path, strlen($this->root) + 1);
     $this->libraryDiscoveryParser->setPaths('module', 'example_module', $path);
 
-    $this->assertSame($this->libraryDiscoveryParser->buildByExtension('example_module'), array());
+    $this->assertSame($this->libraryDiscoveryParser->buildByExtension('example_module'), []);
   }
 
   /**
    * Tests that an exception is thrown when a libraries file couldn't be parsed.
-   *
-   * @expectedException \Drupal\Core\Asset\Exception\InvalidLibraryFileException
    *
    * @covers ::buildByExtension
    */
@@ -157,14 +167,31 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $path = substr($path, strlen($this->root) + 1);
     $this->libraryDiscoveryParser->setPaths('module', 'invalid_file', $path);
 
+    $this->expectException(InvalidLibraryFileException::class);
     $this->libraryDiscoveryParser->buildByExtension('invalid_file');
   }
 
   /**
-   * Tests that an exception is thrown when no CSS/JS/setting is specified.
+   * Tests that no exception is thrown when only dependencies are specified.
    *
-   * @expectedException \Drupal\Core\Asset\Exception\IncompleteLibraryDefinitionException
-   * @expectedExceptionMessage Incomplete library definition for definition 'example' in extension 'example_module_missing_information'
+   * @covers ::buildByExtension
+   */
+  public function testBuildByExtensionWithOnlyDependencies() {
+    $this->moduleHandler->expects($this->atLeastOnce())
+      ->method('moduleExists')
+      ->with('example_module_only_dependencies')
+      ->will($this->returnValue(TRUE));
+
+    $path = __DIR__ . '/library_test_files';
+    $path = substr($path, strlen($this->root) + 1);
+    $this->libraryDiscoveryParser->setPaths('module', 'example_module_only_dependencies', $path);
+
+    $libraries = $this->libraryDiscoveryParser->buildByExtension('example_module_only_dependencies');
+    $this->assertArrayHasKey('example', $libraries);
+  }
+
+  /**
+   * Tests that an exception is thrown with only the version property specified.
    *
    * @covers ::buildByExtension
    */
@@ -178,6 +205,8 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $path = substr($path, strlen($this->root) + 1);
     $this->libraryDiscoveryParser->setPaths('module', 'example_module_missing_information', $path);
 
+    $this->expectException(IncompleteLibraryDefinitionException::class);
+    $this->expectExceptionMessage("Incomplete library definition for definition 'example' in extension 'example_module_missing_information'");
     $this->libraryDiscoveryParser->buildByExtension('example_module_missing_information');
   }
 
@@ -210,7 +239,6 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $this->assertEquals(\Drupal::VERSION, $libraries['core-versioned']['css'][0]['version']);
     $this->assertEquals(\Drupal::VERSION, $libraries['core-versioned']['js'][0]['version']);
   }
-
 
   /**
    * Tests that the version property of external libraries is handled.
@@ -276,8 +304,6 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
   /**
    * Ensures that you cannot provide positive weights for JavaScript libraries.
    *
-   * @expectedException \UnexpectedValueException
-   *
    * @covers ::buildByExtension
    */
   public function testJsWithPositiveWeight() {
@@ -290,6 +316,7 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $path = substr($path, strlen($this->root) + 1);
     $this->libraryDiscoveryParser->setPaths('module', 'js_positive_weight', $path);
 
+    $this->expectException(\UnexpectedValueException::class);
     $this->libraryDiscoveryParser->buildByExtension('js_positive_weight');
   }
 
@@ -320,7 +347,7 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $this->assertEquals('file', $library['css'][0]['type']);
     $this->assertEquals($path . '/css/base.css', $library['css'][0]['data']);
 
-    $this->assertEquals(array('key' => 'value'), $library['drupalSettings']);
+    $this->assertEquals(['key' => 'value'], $library['drupalSettings']);
   }
 
   /**
@@ -355,6 +382,9 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $this->moduleHandler->expects($this->atLeastOnce())
       ->method('moduleExists')
       ->with('data_types')
+      ->will($this->returnValue(TRUE));
+    $this->streamWrapperManager->expects($this->atLeastOnce())
+      ->method('isValidUri')
       ->will($this->returnValue(TRUE));
 
     $path = __DIR__ . '/library_test_files';
@@ -400,11 +430,9 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $this->assertEquals(FALSE, $library['js'][0]['minified']);
     $this->assertEquals(TRUE, $library['js'][1]['minified']);
   }
+
   /**
    * Tests that an exception is thrown when license is missing when 3rd party.
-   *
-   * @expectedException \Drupal\Core\Asset\Exception\LibraryDefinitionMissingLicenseException
-   * @expectedExceptionMessage Missing license information in library definition for definition 'no-license-info-but-remote' extension 'licenses_missing_information': it has a remote, but no license.
    *
    * @covers ::buildByExtension
    */
@@ -418,6 +446,8 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $path = substr($path, strlen($this->root) + 1);
     $this->libraryDiscoveryParser->setPaths('module', 'licenses_missing_information', $path);
 
+    $this->expectException(LibraryDefinitionMissingLicenseException::class);
+    $this->expectExceptionMessage("Missing license information in library definition for definition 'no-license-info-but-remote' extension 'licenses_missing_information': it has a remote, but no license.");
     $this->libraryDiscoveryParser->buildByExtension('licenses_missing_information');
   }
 
@@ -443,66 +473,108 @@ class LibraryDiscoveryParserTest extends UnitTestCase {
     $this->assertCount(1, $library['css']);
     $this->assertCount(1, $library['js']);
     $this->assertTrue(isset($library['license']));
-    $default_license = array(
+    $default_license = [
       'name' => 'GNU-GPL-2.0-or-later',
       'url' => 'https://www.drupal.org/licensing/faq',
       'gpl-compatible' => TRUE,
-    );
+    ];
     $this->assertEquals($library['license'], $default_license);
 
     // GPL2-licensed libraries.
     $library = $libraries['gpl2'];
     $this->assertCount(1, $library['css']);
     $this->assertCount(1, $library['js']);
-    $expected_license = array(
+    $expected_license = [
       'name' => 'gpl2',
       'url' => 'https://url-to-gpl2-license',
       'gpl-compatible' => TRUE,
-    );
+    ];
     $this->assertEquals($library['license'], $expected_license);
 
     // MIT-licensed libraries.
     $library = $libraries['mit'];
     $this->assertCount(1, $library['css']);
     $this->assertCount(1, $library['js']);
-    $expected_license = array(
+    $expected_license = [
       'name' => 'MIT',
       'url' => 'https://url-to-mit-license',
       'gpl-compatible' => TRUE,
-    );
+    ];
     $this->assertEquals($library['license'], $expected_license);
 
     // Libraries in the Public Domain.
     $library = $libraries['public-domain'];
     $this->assertCount(1, $library['css']);
     $this->assertCount(1, $library['js']);
-    $expected_license = array(
+    $expected_license = [
       'name' => 'Public Domain',
       'url' => 'https://url-to-public-domain-license',
       'gpl-compatible' => TRUE,
-    );
+    ];
     $this->assertEquals($library['license'], $expected_license);
 
     // Apache-licensed libraries.
     $library = $libraries['apache'];
     $this->assertCount(1, $library['css']);
     $this->assertCount(1, $library['js']);
-    $expected_license = array(
+    $expected_license = [
       'name' => 'apache',
       'url' => 'https://url-to-apache-license',
       'gpl-compatible' => FALSE,
-    );
+    ];
     $this->assertEquals($library['license'], $expected_license);
 
     // Copyrighted libraries.
     $library = $libraries['copyright'];
     $this->assertCount(1, $library['css']);
     $this->assertCount(1, $library['js']);
-    $expected_license = array(
+    $expected_license = [
       'name' => '© Some company',
       'gpl-compatible' => FALSE,
-    );
+    ];
     $this->assertEquals($library['license'], $expected_license);
+  }
+
+  /**
+   * Verifies assertions catch invalid CSS declarations.
+   *
+   * @dataProvider providerTestCssAssert
+   */
+
+  /**
+   * Verify an assertion fails if CSS declarations have non-existent categories.
+   *
+   * @param string $extension
+   *   The css extension to build.
+   * @param string $exception_message
+   *   The expected exception message.
+   *
+   * @dataProvider providerTestCssAssert
+   */
+  public function testCssAssert($extension, $exception_message) {
+    $this->moduleHandler->expects($this->atLeastOnce())
+      ->method('moduleExists')
+      ->with($extension)
+      ->will($this->returnValue(TRUE));
+
+    $path = __DIR__ . '/library_test_files';
+    $path = substr($path, strlen($this->root) + 1);
+    $this->libraryDiscoveryParser->setPaths('module', $extension, $path);
+
+    $this->expectException(\AssertionError::class);
+    $this->expectExceptionMessage($exception_message);
+    $this->libraryDiscoveryParser->buildByExtension($extension);
+  }
+
+  /**
+   * Data provider for testing bad CSS declarations.
+   */
+  public function providerTestCssAssert() {
+    return [
+      'css_bad_category' => ['css_bad_category', 'See https://www.drupal.org/node/2274843.'],
+      'Improper CSS nesting' => ['css_bad_nesting', 'CSS must be nested under a category. See https://www.drupal.org/node/2274843.'],
+      'Improper CSS nesting array' => ['css_bad_nesting_array', 'CSS files should be specified as key/value pairs, where the values are configuration options. See https://www.drupal.org/node/2274843.'],
+    ];
   }
 
 }

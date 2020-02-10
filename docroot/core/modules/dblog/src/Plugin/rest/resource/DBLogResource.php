@@ -2,6 +2,7 @@
 
 namespace Drupal\dblog\Plugin\rest\resource;
 
+use Drupal\Core\Database\Database;
 use Drupal\rest\Plugin\ResourceBase;
 use Drupal\rest\ResourceResponse;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -38,13 +39,13 @@ class DBLogResource extends ResourceBase {
    */
   public function get($id = NULL) {
     if ($id) {
-      $record = db_query("SELECT * FROM {watchdog} WHERE wid = :wid", array(':wid' => $id))
+      $record = Database::getConnection()->query("SELECT * FROM {watchdog} WHERE wid = :wid", [':wid' => $id])
         ->fetchAssoc();
       if (!empty($record)) {
         return new ResourceResponse($record);
       }
 
-      throw new NotFoundHttpException(t('Log entry with ID @id was not found', array('@id' => $id)));
+      throw new NotFoundHttpException(t('Log entry with ID @id was not found', ['@id' => $id]));
     }
 
     throw new BadRequestHttpException(t('No log entry ID was provided'));

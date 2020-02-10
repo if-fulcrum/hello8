@@ -21,21 +21,22 @@ class TelephoneItemTest extends FieldKernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('telephone');
+  public static $modules = ['telephone'];
 
   protected function setUp() {
     parent::setUp();
 
     // Create a telephone field storage and field for validation.
-    FieldStorageConfig::create(array(
+    FieldStorageConfig::create([
       'field_name' => 'field_test',
       'entity_type' => 'entity_test',
       'type' => 'telephone',
-    ))->save();
+    ])->save();
     FieldConfig::create([
       'entity_type' => 'entity_test',
       'field_name' => 'field_test',
       'bundle' => 'entity_test',
+      'default_value' => [0 => ['value' => '+012345678']],
     ])->save();
   }
 

@@ -23,11 +23,11 @@ class BooleanItemTest extends FieldKernelTestBase {
     parent::setUp();
 
     // Create a boolean field and storage for validation.
-    FieldStorageConfig::create(array(
+    FieldStorageConfig::create([
       'field_name' => 'field_boolean',
       'entity_type' => 'entity_test',
       'type' => 'boolean',
-    ))->save();
+    ])->save();
     FieldConfig::create([
       'entity_type' => 'entity_test',
       'field_name' => 'field_boolean',
@@ -35,10 +35,11 @@ class BooleanItemTest extends FieldKernelTestBase {
     ])->save();
 
     // Create a form display for the default form mode.
-    entity_get_form_display('entity_test', 'entity_test', 'default')
-      ->setComponent('field_boolean', array(
+    \Drupal::service('entity_display.repository')
+      ->getFormDisplay('entity_test', 'entity_test')
+      ->setComponent('field_boolean', [
         'type' => 'boolean_checkbox',
-      ))
+      ])
       ->save();
   }
 

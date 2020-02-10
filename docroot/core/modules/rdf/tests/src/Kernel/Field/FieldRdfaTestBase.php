@@ -48,7 +48,7 @@ abstract class FieldRdfaTestBase extends FieldKernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('rdf');
+  public static $modules = ['rdf'];
 
   /**
    * @var string
@@ -83,14 +83,17 @@ abstract class FieldRdfaTestBase extends FieldKernelTestBase {
    *   - datatype: (optional) The datatype of the value (e.g. xsd:dateTime).
    */
   protected function assertFormatterRdfa($formatter, $property, $expected_rdf_value) {
-    $expected_rdf_value += array('type' => 'literal');
+    $expected_rdf_value += ['type' => 'literal'];
 
     // The field formatter will be rendered inside the entity. Set the field
     // formatter in the entity display options before rendering the entity.
-    entity_get_display('entity_test', 'entity_test', 'default')
+    \Drupal::service('entity_display.repository')
+      ->getViewDisplay('entity_test', 'entity_test')
       ->setComponent($this->fieldName, $formatter)
       ->save();
-    $build = entity_view($this->entity, 'default');
+    $build = \Drupal::entityTypeManager()
+      ->getViewBuilder($this->entity->getEntityTypeId())
+      ->view($this->entity, 'default');
     $output = \Drupal::service('renderer')->renderRoot($build);
     $graph = new \EasyRdf_Graph($this->uri, $output, 'rdfa');
     $this->setRawContent($output);
@@ -111,12 +114,12 @@ abstract class FieldRdfaTestBase extends FieldKernelTestBase {
    * @param array $field_settings
    *   (optional) An array of field settings.
    */
-  protected function createTestField($field_settings = array()) {
-    FieldStorageConfig::create(array(
+  protected function createTestField($field_settings = []) {
+    FieldStorageConfig::create([
       'field_name' => $this->fieldName,
       'entity_type' => 'entity_test',
       'type' => $this->fieldType,
-    ))->save();
+    ])->save();
     FieldConfig::create([
       'entity_type' => 'entity_test',
       'field_name' => $this->fieldName,
@@ -135,7 +138,7 @@ abstract class FieldRdfaTestBase extends FieldKernelTestBase {
    *   The absolute URI.
    */
   protected function getAbsoluteUri($entity) {
-    return $entity->url('canonical', array('absolute' => TRUE));
+    return $entity->toUrl('canonical', ['absolute' => TRUE])->toString();
   }
 
   /**
@@ -172,14 +175,14 @@ abstract class FieldRdfaTestBase extends FieldKernelTestBase {
    *   format and return values see the SimpleXML documentation,
    *   http://php.net/manual/function.simplexml-element-xpath.php.
    */
-  protected function xpathContent($content, $xpath, array $arguments = array()) {
+  protected function xpathContent($content, $xpath, array $arguments = []) {
     if ($elements = $this->parseContent($content)) {
       $xpath = $this->buildXPathQuery($xpath, $arguments);
       $result = $elements->xpath($xpath);
       // Some combinations of PHP / libxml versions return an empty array
       // instead of the documented FALSE. Forcefully convert any falsish values
       // to an empty array to allow foreach(...) constructions.
-      return $result ? $result : array();
+      return $result ? $result : [];
     }
     else {
       return FALSE;

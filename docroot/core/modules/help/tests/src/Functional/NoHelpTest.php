@@ -16,9 +16,14 @@ class NoHelpTest extends BrowserTestBase {
    *
    * Use one of the test modules that do not implement hook_help().
    *
-   * @var array.
+   * @var array
    */
-  public static $modules = array('help', 'menu_test');
+  public static $modules = ['help', 'menu_test'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $defaultTheme = 'stark';
 
   /**
    * The user who will be created.
@@ -27,7 +32,7 @@ class NoHelpTest extends BrowserTestBase {
 
   protected function setUp() {
     parent::setUp();
-    $this->adminUser = $this->drupalCreateUser(array('access administration pages'));
+    $this->adminUser = $this->drupalCreateUser(['access administration pages']);
   }
 
   /**

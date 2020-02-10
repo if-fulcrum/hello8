@@ -4,7 +4,7 @@ namespace Drupal\Tests\taxonomy\Kernel;
 
 use Drupal\taxonomy\Entity\Term;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\taxonomy\Tests\TaxonomyTestTrait;
+use Drupal\Tests\taxonomy\Traits\TaxonomyTestTrait;
 
 /**
  * Kernel tests for taxonomy term functions.
@@ -18,31 +18,27 @@ class TermKernelTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = array( 'filter', 'taxonomy', 'text', 'user' );
+  public static $modules = ['filter', 'taxonomy', 'text', 'user'];
 
   /**
    * {@inheritdoc}
    */
   protected function setUp() {
     parent::setUp();
-    $this->installConfig(array('filter'));
+    $this->installConfig(['filter']);
     $this->installEntitySchema('taxonomy_term');
   }
 
   /**
-   * Deleting terms should also remove related vocabulary.
-   * Deleting an invalid term should silently fail.
+   * Tests that a deleted term is no longer in the vocabulary.
    */
   public function testTermDelete() {
     $vocabulary = $this->createVocabulary();
     $valid_term = $this->createTerm($vocabulary);
     // Delete a valid term.
     $valid_term->delete();
-    $terms = entity_load_multiple_by_properties('taxonomy_term', array('vid' => $vocabulary->id()));
+    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties(['vid' => $vocabulary->id()]);
     $this->assertTrue(empty($terms), 'Vocabulary is empty after deletion');
-
-    // Delete an invalid term. Should not throw any notices.
-    entity_delete_multiple('taxonomy_term', array(42));
   }
 
   /**
@@ -53,18 +49,18 @@ class TermKernelTest extends KernelTestBase {
     $parent_term1 = $this->createTerm($vocabulary);
     $parent_term2 = $this->createTerm($vocabulary);
     $child_term = $this->createTerm($vocabulary);
-    $child_term->parent = array($parent_term1->id(), $parent_term2->id());
+    $child_term->parent = [$parent_term1->id(), $parent_term2->id()];
     $child_term->save();
     $child_term_id = $child_term->id();
 
     $parent_term1->delete();
-    $term_storage = $this->container->get('entity.manager')->getStorage('taxonomy_term');
-    $term_storage->resetCache(array($child_term_id));
+    $term_storage = $this->container->get('entity_type.manager')->getStorage('taxonomy_term');
+    $term_storage->resetCache([$child_term_id]);
     $child_term = Term::load($child_term_id);
     $this->assertTrue(!empty($child_term), 'Child term is not deleted if only one of its parents is removed.');
 
     $parent_term2->delete();
-    $term_storage->resetCache(array($child_term_id));
+    $term_storage->resetCache([$child_term_id]);
     $child_term = Term::load($child_term_id);
     $this->assertTrue(empty($child_term), 'Child term is deleted if all of its parents are removed.');
   }
@@ -75,13 +71,13 @@ class TermKernelTest extends KernelTestBase {
   public function testTaxonomyVocabularyTree() {
     // Create a new vocabulary with 6 terms.
     $vocabulary = $this->createVocabulary();
-    $term = array();
+    $term = [];
     for ($i = 0; $i < 6; $i++) {
       $term[$i] = $this->createTerm($vocabulary);
     }
 
     // Get the taxonomy storage.
-    $taxonomy_storage = $this->container->get('entity.manager')->getStorage('taxonomy_term');
+    $taxonomy_storage = $this->container->get('entity_type.manager')->getStorage('taxonomy_term');
 
     // Set the weight on $term[1] so it appears before $term[5] when fetching
     // the parents for $term[2], in order to test for a regression on
@@ -90,13 +86,13 @@ class TermKernelTest extends KernelTestBase {
     $term[1]->save();
 
     // $term[2] is a child of 1 and 5.
-    $term[2]->parent = array($term[1]->id(), $term[5]->id());
+    $term[2]->parent = [$term[1]->id(), $term[5]->id()];
     $term[2]->save();
     // $term[3] is a child of 2.
-    $term[3]->parent = array($term[2]->id());
+    $term[3]->parent = [$term[2]->id()];
     $term[3]->save();
     // $term[5] is a child of 4.
-    $term[5]->parent = array($term[4]->id());
+    $term[5]->parent = [$term[4]->id()];
     $term[5]->save();
 
     /**
@@ -131,7 +127,7 @@ class TermKernelTest extends KernelTestBase {
     $this->assertEqual(1, $depth_count[3], 'One element in taxonomy tree depth 3.');
 
     /** @var \Drupal\taxonomy\TermStorageInterface $storage */
-    $storage = \Drupal::entityManager()->getStorage('taxonomy_term');
+    $storage = \Drupal::entityTypeManager()->getStorage('taxonomy_term');
     // Count parents of $term[2].
     $parents = $storage->loadParents($term[2]->id());
     $this->assertEqual(2, count($parents), 'The term has two parents.');

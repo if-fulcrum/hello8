@@ -3,13 +3,11 @@ type: module
 description: 'Serializes entities using Hypertext Application Language.'
 package: Web services
 # version: VERSION
-# core: 8.x
+core: 8.x
 dependencies:
-  - rest
-  - serialization
+  - drupal:serialization
 
-# Information added by Drupal.org packaging script on 2016-11-16
-version: '8.2.3'
-core: '8.x'
+# Information added by Drupal.org packaging script on 2020-02-01
+version: '8.8.2'
 project: 'drupal'
-datestamp: 1479322545
+datestamp: 1580598903
